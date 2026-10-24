@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diblock Copolymer CDS 3D Visualizer Suite - Afaque Ahmed</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            overflow-x: hidden;
+            background-color: #080d1a;
+            color: #f8fafc;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.92);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .tab-btn.active {
+            background-color: #0284c7 !important;
+            border-color: #38bdf8 !important;
+            color: #ffffff !important;
+            font-weight: 700;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col overflow-hidden select-none">
+
+    <!-- Top Header Navigation -->
+    <header class="glass-panel px-6 py-3 border-b border-slate-800 flex flex-wrap items-center justify-between gap-4 z-30 shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="p-2 bg-sky-500/20 text-sky-400 rounded-lg border border-sky-500/30">
+                <i data-lucide="layers" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-lg text-slate-100 tracking-wide">Diblock Copolymer CDS 3D Visualizer</h1>
+                <p class="text-xs text-slate-400">Cell Dynamics Simulation (FTCS 9-Point Polar Mesh) Interactive Suite</p>
+            </div>
+        </div>
+
+        <!-- Figure Selection Tabs -->
+        <div class="flex items-center gap-1.5 overflow-x-auto py-1 max-w-full" id="figure-tabs">
+            <button class="tab-btn active px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900/80 text-xs text-slate-300 hover:border-sky-400 transition" data-key="fig14">Fig 14 (Lamellae Neutral)</button>
+            <button class="tab-btn px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900/80 text-xs text-slate-300 hover:border-sky-400 transition" data-key="fig16">Fig 16 (Cylindrical Neutral)</button>
+            <button class="tab-btn px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900/80 text-xs text-slate-300 hover:border-sky-400 transition" data-key="fig18">Fig 18 (Spherical Neutral)</button>
+            <button class="tab-btn px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900/80 text-xs text-slate-300 hover:border-sky-400 transition" data-key="fig22">Fig 22 (Perforated Wall)</button>
+            <button class="tab-btn px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900/80 text-xs text-slate-300 hover:border-sky-400 transition" data-key="fig23">Fig 23 (Helical Attractive)</button>
+            <button class="tab-btn px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900/80 text-xs text-slate-300 hover:border-sky-400 transition" data-key="fig24">Fig 24 (Spherical Attractive)</button>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+
+        <!-- 3D Canvas Area -->
+        <div class="relative flex-1 h-full w-full bg-slate-950">
+            <div id="canvas-container" class="w-full h-full"></div>
+
+            <!-- Floating Current Active Model Badge -->
+            <div class="absolute top-4 left-4 z-10 glass-panel px-4 py-2.5 rounded-xl flex items-center gap-3 shadow-xl">
+                <div class="w-3.5 h-3.5 rounded-full bg-sky-400 animate-pulse"></div>
+                <div>
+                    <h2 class="text-[10px] font-bold uppercase tracking-wider text-slate-400" id="fig-subtitle">Section 4.2 - Fig 14</h2>
+                    <p id="view-title" class="text-sm font-bold text-sky-400">(a) Front View</p>
+                </div>
+            </div>
+
+            <!-- Canvas Helper Overlay Controls -->
+            <div class="absolute bottom-4 left-4 z-10 flex gap-2">
+                <button id="reset-cam" class="glass-panel hover:bg-slate-800 text-slate-200 px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-1.5 transition">
+                    <i data-lucide="rotate-ccw" class="w-4 h-4 text-sky-400"></i> Reset Camera
+                </button>
+                <button id="toggle-spin" class="glass-panel hover:bg-slate-800 text-slate-200 px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-1.5 transition">
+                    <i data-lucide="play" class="w-4 h-4 text-sky-400" id="spin-icon"></i> Auto Spin
+                </button>
+            </div>
+        </div>
+
+        <!-- Sidebar: View Angles & Real-time CDS Parameters -->
+        <div class="w-full md:w-96 h-auto md:h-full glass-panel flex flex-col border-l border-slate-800 z-20 overflow-y-auto p-4 space-y-5 shrink-0">
+            
+            <!-- Camera Preset View Angles (a - l) -->
+            <div>
+                <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                    <i data-lucide="camera" class="w-4 h-4 text-sky-400"></i> Figure Rotation Views (a - l)
+                </h3>
+                <div class="grid grid-cols-2 gap-2 text-xs" id="preset-grid"></div>
+            </div>
+
+            <!-- Real-time CDS Simulation Parameter Controls -->
+            <div class="pt-3 border-t border-slate-800 space-y-3">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <i data-lucide="sliders" class="w-4 h-4 text-sky-400"></i> Real-Time CDS Controls
+                    </h3>
+                    <button id="reset-params" class="text-[10px] text-sky-400 hover:underline">Reset Values</button>
+                </div>
+
+                <div class="space-y-2.5 bg-slate-900/60 p-3 rounded-xl border border-slate-800 text-xs">
+                    <!-- Tau Slider -->
+                    <div>
+                        <div class="flex justify-between text-slate-300 mb-1">
+                            <span>Order Parameter (τ):</span>
+                            <span id="tau-val" class="text-sky-400 font-mono">0.36</span>
+                        </div>
+                        <input type="range" id="tau-slider" min="0.10" max="0.50" step="0.01" value="0.36" class="w-full accent-sky-400 bg-slate-800 rounded">
+                    </div>
+
+                    <!-- f Ratio Slider -->
+                    <div>
+                        <div class="flex justify-between text-slate-300 mb-1">
+                            <span>Block Fraction (f):</span>
+                            <span id="f-val" class="text-sky-400 font-mono">0.48</span>
+                        </div>
+                        <input type="range" id="f-slider" min="0.10" max="0.90" step="0.01" value="0.48" class="w-full accent-sky-400 bg-slate-800 rounded">
+                    </div>
+
+                    <!-- Diffusivity D Slider -->
+                    <div>
+                        <div class="flex justify-between text-slate-300 mb-1">
+                            <span>Diffusivity Constant (D):</span>
+                            <span id="d-val" class="text-sky-400 font-mono">0.70</span>
+                        </div>
+                        <input type="range" id="d-slider" min="0.10" max="1.50" step="0.05" value="0.70" class="w-full accent-sky-400 bg-slate-800 rounded">
+                    </div>
+
+                    <!-- Interior Radius r_a Slider -->
+                    <div>
+                        <div class="flex justify-between text-slate-300 mb-1">
+                            <span>Interior Radius (r<sub>a</sub>):</span>
+                            <span id="ra-val" class="text-sky-400 font-mono">3.0</span>
+                        </div>
+                        <input type="range" id="ra-slider" min="1.0" max="6.0" step="0.5" value="3.0" class="w-full accent-sky-400 bg-slate-800 rounded">
+                    </div>
+
+                    <!-- Boundary Confinement Toggle -->
+                    <div>
+                        <label class="text-slate-300 block mb-1">Surface Confinement Mode</label>
+                        <select id="wall-select" class="w-full bg-slate-950 border border-slate-700 text-xs rounded-lg p-1.5 text-slate-200 focus:outline-none focus:border-sky-400">
+                            <option value="neutral">Neutral Surface Boundaries (α = 0)</option>
+                            <option value="attractive">Attractive Surface Walls (α = 0.2)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Static CDS Model Constants -->
+            <div class="pt-2 border-t border-slate-800 text-xs text-slate-400 space-y-1">
+                <div class="flex justify-between">
+                    <span>FTCS Grid Step:</span>
+                    <span class="text-slate-200 font-mono">Δr = 0.1, Δθ = 2π/360</span>
+                </div>
+                <div class="flex justify-between">
+                    <span>Equilibrium Steps:</span>
+                    <span class="text-slate-200 font-mono">t = 1,000,000 steps</span>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Developer Footer (Afaque Ahmed) -->
+    <footer class="glass-panel px-6 py-3 border-t border-slate-800 z-30 flex flex-wrap items-center justify-between gap-4 text-xs shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-sky-500 to-emerald-400 flex items-center justify-center font-bold text-slate-950 text-sm shadow-md">
+                AA
+            </div>
+            <div>
+                <div class="font-bold text-slate-100 text-sm flex items-center gap-2">
+                    Afaque Ahmed 
+                    <span class="text-[10px] font-normal px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/30">Lead Web & AI Developer</span>
+                </div>
+                <p class="text-slate-400 text-[11px]">Department of Artificial Intelligence | Aror University of Art, Architecture, Design and Heritage, Sukkur</p>
+            </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-4 text-slate-300">
+            <div class="flex items-center gap-1.5 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-800">
+                <i data-lucide="phone" class="w-3.5 h-3.5 text-emerald-400"></i>
+                <span class="font-mono text-xs">+92 309 1351482</span>
+            </div>
+            <div class="flex items-center gap-1.5 bg-sky-950/40 text-sky-300 px-3 py-1.5 rounded-lg border border-sky-500/30">
+                <i data-lucide="briefcase" class="w-3.5 h-3.5"></i>
+                <span>Available for Thesis & 3D Simulation Projects</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript Execution Logic -->
+    <script>
+        // Init Icons
+        lucide.createIcons();
+
+        // 6 Figure Presets Data
+        const MODELS_DATA = {
+            fig14: {
+                title: "Section 4.2 - Fig 14",
+                name: "Lamellae Neutral System",
+                type: "lamellae",
+                params: { tau: 0.36, f: 0.48, d: 0.70, ra: 3.0, wall: "neutral" }
+            },
+            fig16: {
+                title: "Section 4.4 - Fig 16",
+                name: "Cylindrical Neutral System",
+                type: "cylindrical_neutral",
+                params: { tau: 0.30, f: 0.40, d: 0.50, ra: 3.0, wall: "neutral" }
+            },
+            fig18: {
+                title: "Section 4.6 - Fig 18",
+                name: "Spherical Neutral Pores",
+                type: "spherical_neutral",
+                params: { tau: 0.20, f: 0.40, d: 0.50, ra: 3.0, wall: "neutral" }
+            },
+            fig22: {
+                title: "Section 4.8 - Fig 22",
+                name: "Cylindrical Perforated Wall",
+                type: "perforated",
+                params: { tau: 0.36, f: 0.48, d: 0.70, ra: 3.0, wall: "neutral" }
+            },
+            fig23: {
+                title: "Section 4.10 - Fig 23",
+                name: "Cylindrical Helical Attractive",
+                type: "helical_attractive",
+                params: { tau: 0.36, f: 0.48, d: 0.70, ra: 3.0, wall: "attractive" }
+            },
+            fig24: {
+                title: "Section 4.12 - Fig 24",
+                name: "Spherical Beads Attractive",
+                type: "spherical_beads",
+                params: { tau: 0.36, f: 0.48, d: 0.70, ra: 3.0, wall: "attractive" }
+            }
+        };
+
+        // 12 Standard Projection Angles (a to l)
+        const VIEW_PRESETS = [
+            { id: 'a', name: 'Front View', pos: [0, 0, 11], target: [0, 0, 0] },
+            { id: 'b', name: 'Back View', pos: [0, 0, -11], target: [0, 0, 0] },
+            { id: 'c', name: 'Top View', pos: [0, 11, 0.001], target: [0, 0, 0] },
+            { id: 'd', name: 'Bottom View', pos: [0, -11, 0.001], target: [0, 0, 0] },
+            { id: 'e', name: 'Right View', pos: [11, 0, 0], target: [0, 0, 0] },
+            { id: 'f', name: 'Left View', pos: [-11, 0, 0], target: [0, 0, 0] },
+            { id: 'g', name: 'Diagonal', pos: [7, 7, 7], target: [0, 0, 0] },
+            { id: 'h', name: 'Off Diagonal', pos: [-7, 8, 6], target: [0, 0, 0] },
+            { id: 'i', name: 'Off Front', pos: [3, 4, 10], target: [0, 0, 0] },
+            { id: 'j', name: 'Off Back', pos: [4, 4, -10], target: [0, 0, 0] },
+            { id: 'k', name: 'Top Bottom', pos: [2, 9, 4], target: [0, 0, 0] },
+            { id: 'l', name: 'Off Bottom', pos: [-3, -9, 4], target: [0, 0, 0] }
+        ];
+
+        let scene, camera, renderer, controls;
+        let activeMeshGroup;
+        let currentModelKey = 'fig14';
+        let autoSpin = false;
+
+        // Current Interactive Controls State
+        let currentParams = { ...MODELS_DATA.fig14.params };
+
+        const container = document.getElementById('canvas-container');
+        const viewTitle = document.getElementById('view-title');
+        const presetGrid = document.getElementById('preset-grid');
+
+        // Render Preset Angle Buttons (a - l)
+        VIEW_PRESETS.forEach((preset) => {
+            const btn = document.createElement('button');
+            btn.className = `view-btn text-left p-2 rounded-lg border border-slate-800 bg-slate-900/60 hover:bg-sky-950/40 hover:border-sky-400 transition text-slate-300 font-medium flex items-center justify-between`;
+            btn.innerHTML = `<span><strong class="text-sky-400">(${preset.id})</strong> ${preset.name}</span>`;
+            btn.onclick = () => applyPresetView(preset, btn);
+            presetGrid.appendChild(btn);
+        });
+
+        // Initialize 3D Engine & Scene
+        function init3DScene() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x070b14);
+
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.set(0, 0, 11);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            container.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(10, 15, 10);
+            scene.add(dirLight);
+
+            // Bind Navigation Tabs Safely
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const key = e.currentTarget.getAttribute('data-key');
+                    switchFigure(key, e.currentTarget);
+                });
+            });
+
+            // Bind Real-Time Slider Events
+            bindSliderEvents();
+
+            renderCurrentModel();
+            applyPresetView(VIEW_PRESETS[0], presetGrid.children[0]);
+
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        // Switch Model Selection
+        function switchFigure(key, clickedBtn) {
+            currentModelKey = key;
+
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            if (clickedBtn) clickedBtn.classList.add('active');
+
+            const model = MODELS_DATA[key];
+            document.getElementById('fig-subtitle').innerText = `${model.title} - ${model.name}`;
+
+            // Sync controls with model presets
+            currentParams = { ...model.params };
+            updateUIControls();
+
+            renderCurrentModel();
+        }
+
+        function updateUIControls() {
+            document.getElementById('tau-slider').value = currentParams.tau;
+            document.getElementById('tau-val').innerText = parseFloat(currentParams.tau).toFixed(2);
+
+            document.getElementById('f-slider').value = currentParams.f;
+            document.getElementById('f-val').innerText = parseFloat(currentParams.f).toFixed(2);
+
+            document.getElementById('d-slider').value = currentParams.d;
+            document.getElementById('d-val').innerText = parseFloat(currentParams.d).toFixed(2);
+
+            document.getElementById('ra-slider').value = currentParams.ra;
+            document.getElementById('ra-val').innerText = parseFloat(currentParams.ra).toFixed(1);
+
+            document.getElementById('wall-select').value = currentParams.wall;
+        }
+
+        function bindSliderEvents() {
+            document.getElementById('tau-slider').addEventListener('input', (e) => {
+                currentParams.tau = parseFloat(e.target.value);
+                document.getElementById('tau-val').innerText = currentParams.tau.toFixed(2);
+                renderCurrentModel();
+            });
+
+            document.getElementById('f-slider').addEventListener('input', (e) => {
+                currentParams.f = parseFloat(e.target.value);
+                document.getElementById('f-val').innerText = currentParams.f.toFixed(2);
+                renderCurrentModel();
+            });
+
+            document.getElementById('d-slider').addEventListener('input', (e) => {
+                currentParams.d = parseFloat(e.target.value);
+                document.getElementById('d-val').innerText = currentParams.d.toFixed(2);
+                renderCurrentModel();
+            });
+
+            document.getElementById('ra-slider').addEventListener('input', (e) => {
+                currentParams.ra = parseFloat(e.target.value);
+                document.getElementById('ra-val').innerText = currentParams.ra.toFixed(1);
+                renderCurrentModel();
+            });
+
+            document.getElementById('wall-select').addEventListener('change', (e) => {
+                currentParams.wall = e.target.value;
+                renderCurrentModel();
+            });
+
+            document.getElementById('reset-params').addEventListener('click', () => {
+                currentParams = { ...MODELS_DATA[currentModelKey].params };
+                updateUIControls();
+                renderCurrentModel();
+            });
+        }
+
+        // Render Geometry & Custom WebGL Shaders
+        function renderCurrentModel() {
+            if (activeMeshGroup) scene.remove(activeMeshGroup);
+
+            activeMeshGroup = new THREE.Group();
+            const modelType = MODELS_DATA[currentModelKey].type;
+
+            const ra = currentParams.ra;
+            const outerR = ra + 3.0;
+            const height = 4.0;
+
+            if (modelType === 'lamellae') {
+                const mat = createShaderMaterial('lamellae');
+                const outerMesh = new THREE.Mesh(new THREE.CylinderGeometry(outerR, outerR, height, 64, 1, true), mat);
+                const innerMesh = new THREE.Mesh(new THREE.CylinderGeometry(ra, ra, height, 64, 1, true), mat);
+                const capGeo = new THREE.RingGeometry(ra, outerR, 64);
+                const topCap = new THREE.Mesh(capGeo, mat); topCap.rotation.x = -Math.PI / 2; topCap.position.y = height/2;
+                const botCap = new THREE.Mesh(capGeo, mat); botCap.rotation.x = Math.PI / 2; botCap.position.y = -height/2;
+                activeMeshGroup.add(outerMesh, innerMesh, topCap, botCap);
+
+            } else if (modelType === 'spherical_beads') {
+                const numSpheres = Math.floor(1200 * (currentParams.f * 2.0));
+                const sphereGeo = new THREE.SphereGeometry(0.18, 12, 12);
+                const sphereMat = new THREE.MeshStandardMaterial({ color: 0xffcc00, roughness: 0.2 });
+                const instancedMesh = new THREE.InstancedMesh(sphereGeo, sphereMat, numSpheres);
+                const dummy = new THREE.Object3D();
+
+                for (let i = 0; i < numSpheres; i++) {
+                    const r = ra + Math.random() * (outerR - ra);
+                    const theta = Math.random() * Math.PI * 2;
+                    const z = (Math.random() - 0.5) * height;
+                    dummy.position.set(r * Math.cos(theta), r * Math.sin(theta), z);
+                    dummy.updateMatrix();
+                    instancedMesh.setMatrixAt(i, dummy.matrix);
+                }
+                instancedMesh.instanceMatrix.needsUpdate = true;
+                activeMeshGroup.add(instancedMesh);
+
+            } else if (modelType === 'helical_attractive') {
+                for (let i = 0; i < 3; i++) {
+                    const r = ra + i * 0.9;
+                    const mat = createShaderMaterial('helical');
+                    const cyl = new THREE.Mesh(new THREE.CylinderGeometry(r, r, height, 64, 1, true), mat);
+                    const rimMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, wireframe: true });
+                    const ring = new THREE.Mesh(new THREE.RingGeometry(r - 0.05, r + 0.05, 64), rimMat);
+                    ring.rotation.x = Math.PI/2; ring.position.y = height/2;
+                    activeMeshGroup.add(cyl, ring);
+                }
+
+            } else if (modelType === 'perforated') {
+                const mat = createShaderMaterial('perforated');
+                for (let i = 0; i < 2; i++) {
+                    const r = ra + i * 1.0;
+                    const cyl = new THREE.Mesh(new THREE.CylinderGeometry(r, r, height, 64, 32, true), mat);
+                    activeMeshGroup.add(cyl);
+                }
+
+            } else if (modelType === 'spherical_neutral') {
+                const bgMat = new THREE.MeshStandardMaterial({ color: 0x00a8e8, roughness: 0.3 });
+                activeMeshGroup.add(new THREE.Mesh(new THREE.CylinderGeometry(outerR, outerR, height, 48, 1, true), bgMat));
+                activeMeshGroup.add(new THREE.Mesh(new THREE.CylinderGeometry(ra, ra, height, 48, 1, true), bgMat));
+
+                const numSpheres = 900;
+                const sphereGeo = new THREE.SphereGeometry(0.16, 12, 12);
+                const sphereMat = new THREE.MeshStandardMaterial({ color: 0xffd000 });
+                const instancedMesh = new THREE.InstancedMesh(sphereGeo, sphereMat, numSpheres);
+                const dummy = new THREE.Object3D();
+
+                for (let i = 0; i < numSpheres; i++) {
+                    const r = ra + Math.random() * (outerR - ra);
+                    const theta = Math.random() * Math.PI * 2;
+                    const z = (Math.random() - 0.5) * height;
+                    dummy.position.set(r * Math.cos(theta), r * Math.sin(theta), z);
+                    dummy.updateMatrix();
+                    instancedMesh.setMatrixAt(i, dummy.matrix);
+                }
+                instancedMesh.instanceMatrix.needsUpdate = true;
+                activeMeshGroup.add(instancedMesh);
+
+            } else if (modelType === 'cylindrical_neutral') {
+                const mat = createShaderMaterial('cylindrical_neutral');
+                activeMeshGroup.add(new THREE.Mesh(new THREE.CylinderGeometry(outerR, outerR, height, 64, 1, true), mat));
+                activeMeshGroup.add(new THREE.Mesh(new THREE.CylinderGeometry(ra, ra, height, 64, 1, true), mat));
+            }
+
+            scene.add(activeMeshGroup);
+        }
+
+        // Custom Dynamic WebGL Shaders
+        function createShaderMaterial(type) {
+            const tau = currentParams.tau;
+            const f = currentParams.f;
+            const isAttractive = currentParams.wall === 'attractive' ? 1.0 : 0.0;
+
+            if (type === 'lamellae') {
+                return new THREE.ShaderMaterial({
+                    uniforms: { uTau: { value: tau }, uF: { value: f }, uWall: { value: isAttractive } },
+                    vertexShader: `varying vec3 vPos; varying vec3 vNorm; void main() { vNorm = normalize(normalMatrix * normal); vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+                    fragmentShader: `
+                        uniform float uTau; uniform float uF; uniform float uWall;
+                        varying vec3 vPos; varying vec3 vNorm;
+                        void main() {
+                            float stripe = sin(vPos.x * (10.0 * uTau) + sin(vPos.y * (8.0 * uF)));
+                            if (uWall > 0.5) stripe = sin((length(vPos.xy) - 3.0) * 15.0 * uTau);
+                            vec3 col = mix(vec3(0.0, 0.4, 0.95), vec3(0.2, 0.85, 0.25), smoothstep(-0.2, 0.2, stripe));
+                            float diff = max(dot(vNorm, normalize(vec3(1.0, 1.5, 2.0))), 0.35);
+                            gl_FragColor = vec4(col * diff, 1.0);
+                        }
+                    `,
+                    side: THREE.DoubleSide
+                });
+            } else if (type === 'helical') {
+                return new THREE.ShaderMaterial({
+                    uniforms: { uTau: { value: tau } },
+                    vertexShader: `varying vec3 vPos; varying vec3 vNorm; void main() { vNorm = normalize(normalMatrix * normal); vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+                    fragmentShader: `
+                        uniform float uTau;
+                        varying vec3 vPos; varying vec3 vNorm;
+                        void main() {
+                            float theta = atan(vPos.y, vPos.x);
+                            float stripe = sin(theta * 12.0 + vPos.z * (12.0 * uTau));
+                            vec3 col = mix(vec3(0.55, 0.88, 0.1), vec3(0.85, 0.95, 0.2), smoothstep(-0.5, 0.5, stripe));
+                            float diff = max(dot(vNorm, normalize(vec3(1.0, 1.5, 2.0))), 0.4);
+                            gl_FragColor = vec4(col * diff, 1.0);
+                        }
+                    `,
+                    side: THREE.DoubleSide
+                });
+            } else if (type === 'perforated') {
+                return new THREE.ShaderMaterial({
+                    uniforms: { uF: { value: f } },
+                    vertexShader: `varying vec3 vPos; varying vec3 vNorm; void main() { vNorm = normalize(normalMatrix * normal); vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+                    fragmentShader: `
+                        uniform float uF;
+                        varying vec3 vPos; varying vec3 vNorm;
+                        void main() {
+                            float theta = atan(vPos.y, vPos.x);
+                            float hole = sin(theta * (30.0 * uF)) * cos(vPos.z * 6.0);
+                            if (hole > 0.60) discard;
+                            vec3 col = vec3(0.65, 0.88, 0.05);
+                            float diff = max(dot(vNorm, normalize(vec3(1.0, 1.5, 2.0))), 0.35);
+                            gl_FragColor = vec4(col * diff, 1.0);
+                        }
+                    `,
+                    side: THREE.DoubleSide
+                });
+            } else {
+                return new THREE.ShaderMaterial({
+                    uniforms: { uTau: { value: tau } },
+                    vertexShader: `varying vec3 vPos; varying vec3 vNorm; void main() { vNorm = normalize(normalMatrix * normal); vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+                    fragmentShader: `
+                        uniform float uTau;
+                        varying vec3 vPos; varying vec3 vNorm;
+                        void main() {
+                            float theta = atan(vPos.y, vPos.x);
+                            float field = sin(theta * (40.0 * uTau)) + cos(vPos.z * 4.0);
+                            vec3 col = mix(vec3(0.0, 0.45, 0.9), vec3(0.9, 0.95, 0.1), smoothstep(0.2, 0.8, field));
+                            float diff = max(dot(vNorm, normalize(vec3(1.0, 1.5, 2.0))), 0.35);
+                            gl_FragColor = vec4(col * diff, 1.0);
+                        }
+                    `,
+                    side: THREE.DoubleSide
+                });
+            }
+        }
+
+        function applyPresetView(preset, btnElement) {
+            document.querySelectorAll('.view-btn').forEach(b => {
+                b.classList.remove('border-sky-400', 'bg-sky-950/40');
+                b.classList.add('border-slate-800', 'bg-slate-900/60');
+            });
+            if (btnElement) {
+                btnElement.classList.add('border-sky-400', 'bg-sky-950/40');
+                btnElement.classList.remove('border-slate-800', 'bg-slate-900/60');
+            }
+
+            const [px, py, pz] = preset.pos;
+            const [tx, ty, tz] = preset.target;
+
+            camera.position.set(px, py, pz);
+            controls.target.set(tx, ty, tz);
+            controls.update();
+
+            viewTitle.innerText = `(${preset.id}) ${preset.name}`;
+        }
+
+        function onWindowResize() {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (autoSpin && activeMeshGroup) {
+                activeMeshGroup.rotation.y += 0.005;
+                activeMeshGroup.rotation.x += 0.002;
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        document.getElementById('reset-cam').onclick = () => {
+            applyPresetView(VIEW_PRESETS[0], presetGrid.children[0]);
+            if (activeMeshGroup) activeMeshGroup.rotation.set(0, 0, 0);
+        };
+
+        document.getElementById('toggle-spin').onclick = () => {
+            autoSpin = !autoSpin;
+            const icon = document.getElementById('spin-icon');
+            if (autoSpin) {
+                icon.setAttribute('data-lucide', 'pause');
+            } else {
+                icon.setAttribute('data-lucide', 'play');
+            }
+            lucide.createIcons();
+        };
+
+        window.onload = () => {
+            init3DScene();
+            animate();
+        };
+    </script>
+</body>
+</html>
