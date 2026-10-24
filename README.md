@@ -47,8 +47,8 @@ The interactive suite reflects Cell Dynamics Simulation (CDS) parameters across 
 ---
 
 ## 🚀 How to Run Locally
-link provided: 
-
+1. Click on link provided:https://afaquehassan.github.io/diblock-copolymer-3d-visualizer_/
+2. if you are using in Mobile you should Mode on desktop in site then it will be abte to good working, otherwise you are in laptop then  it will be able to working good
 ---
 
 ## 👨‍💻 Developer & Contributor Profile
